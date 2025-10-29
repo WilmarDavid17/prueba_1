@@ -1,30 +1,21 @@
-import { neon, neonConfig } from "@neondatabase/serverless";
+import { Pool } from "pg"
 
-neonConfig.fetchConnectionCache = true;
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+})
 
-// Crear cliente a partir de la URL del .env
-const sql = neon(process.env.DATABASE_URL!);
-
-/**
- * Ejecuta consultas SQL con o sin parámetros.
- * Usa sql.unsafe() para aceptar strings dinámicos.
- */
-export async function query<T = any>(queryText: string, params?: any[]): Promise<T> {
+export async function query(text: string, params?: any[]) {
+  const client = await pool.connect()
   try {
-    let result;
-
-    if (params && params.length > 0) {
-      // Usa sql.unsafe(queryText, params) correctamente
-      const unsafe = (sql as any).unsafe; // forzamos el tipo para compatibilidad
-      result = await unsafe(queryText, params);
-    } else {
-      const unsafe = (sql as any).unsafe;
-      result = await unsafe(queryText);
-    }
-
-    return result as T;
+    const result = await client.query(text, params)
+    return result
   } catch (error) {
-    console.error("[Neon] Error ejecutando query:", error);
-    throw error;
+    console.error("[v0] Database error:", error)
+    throw error
+  } finally {
+    client.release()
   }
 }
