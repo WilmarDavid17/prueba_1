@@ -13,13 +13,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Falta el número de salón" }, { status: 400 })
     }
 
-    // Actualizar el último acceso abierto para ese salón
+    // ✅ Cerrar el acceso más reciente (el último 'ABIERTO')
     const result = await query(
-      `UPDATE accesos 
-       SET hora_cierre = NOW(), estado = 'CERRADO' 
-       WHERE salon = ? AND estado = 'ABIERTO' 
-       ORDER BY hora_apertura DESC 
-       LIMIT 1`,
+      `UPDATE accesos
+       SET hora_cierre = NOW(), estado = 'CERRADO'
+       WHERE id = (
+         SELECT id FROM accesos
+         WHERE salon = $1 AND estado = 'ABIERTO'
+         ORDER BY hora_apertura DESC
+         LIMIT 1
+       )`,
       [salon],
     )
 
