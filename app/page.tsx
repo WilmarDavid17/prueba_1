@@ -81,22 +81,23 @@ export default function AccessControlPage() {
   }
 
   const fetchAccessRecords = async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch("/api/accesos")
-      const result = await response.json()
+  try {
+    const response = await fetch("/api/accesos")
+    if (response.ok) {
+      const data = await response.json()
 
-      if (result.success) {
-        setAccessRecords(result.data)
-      } else {
-        console.error("[v0] Error fetching records:", result.error)
-      }
-    } catch (error) {
-      console.error("[v0] Error fetching access records:", error)
-    } finally {
-      setIsLoading(false)
+      // ✅ Garantiza que siempre sea un array
+      const recordsArray = Array.isArray(data) ? data : []
+
+      setAccessRecords(recordsArray)
+    } else {
+      console.error("[v0] Error fetching access records, status:", response.status)
     }
+  } catch (error) {
+    console.error("[v0] Error fetching access records:", error)
   }
+}
+
 
   const handleOpenRoom = async (roomId: string) => {
     if (!selectedProfessor) {

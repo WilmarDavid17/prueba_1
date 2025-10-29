@@ -1,44 +1,30 @@
-import mysql from "mysql2/promise";
+import { neon, neonConfig } from "@neondatabase/serverless";
 
-const isProduction = process.env.NODE_ENV === "production";
+neonConfig.fetchConnectionCache = true;
 
-// Configuración de conexión (usa variables de entorno en producción)
-const dbConfig = {
-  host: process.env.DB_HOST || (isProduction ? "" : "localhost"),
-  user: process.env.DB_USER || (isProduction ? "" : "root"),
-  password: process.env.DB_PASSWORD || (isProduction ? "" : "misionTic2022"),
-  database: process.env.DB_NAME || "control_acceso_salones",
-  port: Number.parseInt(process.env.DB_PORT || "3306"),
-  ssl: isProduction
-    ? {
-        rejectUnauthorized: true, // Requerido para PlanetScale / MySQL Cloud
-      }
-    : undefined,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-};
+// Crear cliente a partir de la URL del .env
+const sql = neon(process.env.DATABASE_URL!);
 
-// Pool global para evitar múltiples conexiones
-let pool: mysql.Pool | null = null;
-
-export function getPool() {
-  if (!pool) {
-    pool = mysql.createPool(dbConfig);
-    console.log("[DB] Pool de conexión inicializado");
-  }
-  return pool;
-}
-
-export async function query<T = any>(sql: string, params?: any[]): Promise<T> {
-  const connection = await getPool().getConnection();
+/**
+ * Ejecuta consultas SQL con o sin parámetros.
+ * Usa sql.unsafe() para aceptar strings dinámicos.
+ */
+export async function query<T = any>(queryText: string, params?: any[]): Promise<T> {
   try {
-    const [results] = await connection.execute(sql, params);
-    return results as T;
-  } catch (err) {
-    console.error("[DB Error]", err);
-    throw err;
-  } finally {
-    connection.release();
+    let result;
+
+    if (params && params.length > 0) {
+      // Usa sql.unsafe(queryText, params) correctamente
+      const unsafe = (sql as any).unsafe; // forzamos el tipo para compatibilidad
+      result = await unsafe(queryText, params);
+    } else {
+      const unsafe = (sql as any).unsafe;
+      result = await unsafe(queryText);
+    }
+
+    return result as T;
+  } catch (error) {
+    console.error("[Neon] Error ejecutando query:", error);
+    throw error;
   }
 }
