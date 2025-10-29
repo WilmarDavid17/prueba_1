@@ -32,7 +32,7 @@ export function ProfessorManagement() {
 
   // 🔌 Conectar con el lector RFID físico (ESP32)
   useEffect(() => {
-    const socket = new WebSocket("ws://192.168.1.120:81") // ⚠️ Cambia por la IP del ESP32
+    const socket = new WebSocket("wss://192.168.1.120:81") // ⚠️ Cambia por la IP del ESP32
     wsRef.current = socket
 
     socket.onopen = () => {

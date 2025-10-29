@@ -1,24 +1,23 @@
-// /lib/websocket.ts
 import { WebSocketServer } from "ws"
 import { query } from "@/lib/db"
 
 let wss: WebSocketServer | null = null
 
 export function initWebSocket(server: any) {
-  if (wss) return wss // evitar crear varios
+  if (wss) return wss
 
   wss = new WebSocketServer({ server })
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws: { on: (arg0: string, arg1: (message: any) => Promise<void>) => void; send: (arg0: string) => void }) => {
     console.log("🟢 Nueva conexión WebSocket desde ESP32")
 
     ws.on("message", async (message) => {
       try {
         const data = JSON.parse(message.toString())
 
-        // Mensaje desde la ESP32: { type: "scan", rfid: "123ABC" }
         if (data.type === "scan" && data.rfid) {
-          const [profesor] = await query("SELECT * FROM profesores WHERE rfid = ?", [data.rfid])
+          const result = await query("SELECT * FROM profesores WHERE rfid = $1", [data.rfid])
+          const profesor = result.rows[0]
 
           if (profesor) {
             ws.send(
@@ -29,24 +28,13 @@ export function initWebSocket(server: any) {
               })
             )
           } else {
-            ws.send(
-              JSON.stringify({
-                type: "not_found",
-                message: "Tarjeta no registrada",
-              })
-            )
+            ws.send(JSON.stringify({ type: "not_found", message: "Tarjeta no registrada" }))
           }
         }
 
-        // Registro nuevo: { type: "register", rfid: "123ABC", nombre: "Carlos" }
         if (data.type === "register" && data.rfid && data.nombre) {
-          await query("INSERT INTO profesores (rfid, nombre) VALUES (?, ?)", [data.rfid, data.nombre])
-          ws.send(
-            JSON.stringify({
-              type: "registered",
-              message: "Profesor registrado correctamente",
-            })
-          )
+          await query("INSERT INTO profesores (rfid, nombre) VALUES ($1, $2)", [data.rfid, data.nombre])
+          ws.send(JSON.stringify({ type: "registered", message: "Profesor registrado correctamente" }))
         }
       } catch (err) {
         console.error("❌ Error procesando mensaje:", err)
