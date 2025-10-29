@@ -1,4 +1,5 @@
-import { type NextRequest, NextResponse } from "next/server"
+// app/api/accesos/cerrar/route.ts
+import { NextRequest, NextResponse } from "next/server"
 import { query } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
@@ -8,12 +9,16 @@ export async function PUT(request: NextRequest) {
   try {
     const body = await request.json()
     const { salon } = body
+    console.log("[v0] PUT /api/accesos/cerrar body:", body)
 
     if (!salon) {
-      return NextResponse.json({ success: false, error: "Falta el número de salón" }, { status: 400 })
+      return NextResponse.json(
+        { success: false, error: "Falta el número de salón" },
+        { status: 400 }
+      )
     }
 
-    // ✅ Cerrar el acceso más reciente (el último 'ABIERTO')
+    // ✅ Cerrar el último acceso 'ABIERTO' de ese salón
     const result = await query(
       `UPDATE accesos
        SET hora_cierre = NOW(), estado = 'CERRADO'
@@ -22,17 +27,31 @@ export async function PUT(request: NextRequest) {
          WHERE salon = $1 AND estado = 'ABIERTO'
          ORDER BY hora_apertura DESC
          LIMIT 1
-       )`,
-      [salon],
+       )
+       RETURNING *`,
+      [salon]
     )
 
+    const closed = (result as any).rows?.[0] || null
+    if (!closed) {
+      console.log("[v0] PUT /api/accesos/cerrar: no se encontró acceso abierto para cerrar")
+      return NextResponse.json(
+        { success: false, error: "No hay un acceso abierto para este salón" },
+        { status: 404 }
+      )
+    }
+
+    console.log("[v0] PUT /api/accesos/cerrar: acceso cerrado:", closed)
     return NextResponse.json({
       success: true,
       message: "Salón cerrado correctamente",
-      data: result,
+      data: closed,
     })
-  } catch (error) {
-    console.error("[v0] Error closing acceso:", error)
-    return NextResponse.json({ success: false, error: "Error al cerrar el salón" }, { status: 500 })
+  } catch (error: any) {
+    console.error("[v0] PUT /api/accesos/cerrar error:", error.message, error.code)
+    return NextResponse.json(
+      { success: false, error: "Error al cerrar el salón" },
+      { status: 500 }
+    )
   }
 }
