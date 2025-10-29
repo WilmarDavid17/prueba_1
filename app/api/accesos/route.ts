@@ -3,15 +3,18 @@ import { query } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
-// GET - Obtener todos los accesos
+// ✅ GET - Obtener todos los accesos
 export async function GET() {
   try {
-    const accesos = await query(
+    const result = await query(
       `SELECT id, rfid, nombre_profesor, salon, hora_apertura, hora_cierre, estado 
        FROM accesos 
        ORDER BY hora_apertura DESC 
-       LIMIT 100`,
+       LIMIT 100`
     )
+
+    // En PostgreSQL, los resultados están dentro de "rows"
+    const accesos = (result as any).rows || result
 
     return NextResponse.json({ success: true, data: accesos })
   } catch (error) {
@@ -20,7 +23,7 @@ export async function GET() {
   }
 }
 
-// POST - Crear nuevo acceso (abrir salón)
+// ✅ POST - Crear nuevo acceso (abrir salón)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -30,16 +33,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Faltan datos requeridos" }, { status: 400 })
     }
 
+    // En PostgreSQL se usan $1, $2, $3 en lugar de ?
     const result = await query(
-      `INSERT INTO accesos (rfid, nombre_profesor, salon, hora_apertura, estado) 
-       VALUES (?, ?, ?, NOW(), 'ABIERTO')`,
-      [rfid, nombre_profesor, salon],
+      `INSERT INTO accesos (rfid, nombre_profesor, salon, hora_apertura, estado)
+       VALUES ($1, $2, $3, NOW(), 'ABIERTO')
+       RETURNING *`,
+      [rfid, nombre_profesor, salon]
     )
+
+    const inserted = (result as any).rows?.[0] || null
 
     return NextResponse.json({
       success: true,
       message: "Acceso registrado correctamente",
-      data: result,
+      data: inserted,
     })
   } catch (error) {
     console.error("[v0] Error creating acceso:", error)
